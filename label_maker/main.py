@@ -4,10 +4,13 @@ import sys
 import argparse
 import logging
 import json
+import numpy as np
 from os import makedirs, path as op
 
 from cerberus import Validator
 from shapely.geometry import MultiPolygon, Polygon
+from shapely.geometry import shape
+from shapely.ops import unary_union
 
 from label_maker.version import __version__
 from label_maker.download import download_mbtiles
@@ -20,9 +23,9 @@ from label_maker.validate import schema
 logger = logging.getLogger(__name__)
 
 def get_bounds(feature_collection):
-    """Get a bounding box for a FeatureCollection of Polygon Features"""
-    features = [f for f in feature_collection['features'] if f['geometry']['type'] in ['Polygon']]
-    return MultiPolygon(list(map(lambda x: Polygon(x['geometry']['coordinates'][0]), features))).bounds
+    """Get a bounding box for a FeatureCollection"""
+    shape_lst = [shape(f['geometry']) for f in feature_collection['features']]
+    return unary_union(shape_lst).bounds
 
 
 def parse_args(args):
@@ -47,7 +50,7 @@ def parse_args(args):
     subparsers.add_parser('download', parents=[pparser], help='', formatter_class=dhf)
     l = subparsers.add_parser('labels', parents=[pparser], help='', formatter_class=dhf)
     p = subparsers.add_parser('preview', parents=[pparser], help='', formatter_class=dhf)
-    subparsers.add_parser('images', parents=[pparser], help='', formatter_class=dhf)
+    i = subparsers.add_parser('images', parents=[pparser], help='', formatter_class=dhf)
     subparsers.add_parser('package', parents=[pparser], help='', formatter_class=dhf)
 
     # labels has an optional parameter
@@ -56,6 +59,10 @@ def parse_args(args):
     # preview has an optional parameter
     p.add_argument('-n', '--number', default=5, type=int,
                    help='number of examples images to create per class')
+
+    #images has optional parameter
+    i.add_argument('-t', '--threadcount', default=10, type=int,
+                    help= 'thread count to use')
 
     # turn namespace into dictinary
     parsed_args = vars(parser.parse_args(args))
@@ -94,8 +101,15 @@ def cli():
 
     # for geojson, overwrite other config keys to correct labeling
     if 'geojson' in config.keys():
-        config['country'] = op.splitext(op.basename(config.get('geojson')))[0]
+        config['country'] = [op.splitext(op.basename(config['geojson']))[0]]
         config['bounding_box'] = get_bounds(json.load(open(config.get('geojson'), 'r')))
+
+    if isinstance(config.get('country'), str):
+        config['country'] = [config['country']]
+
+    # Convert HTTP auth from list to tuple if it exists
+    if 'http_auth' in config.keys():
+        config['http_auth'] = tuple(config['http_auth'])
 
     if cmd == 'download':
         download_mbtiles(dest_folder=dest_folder, **config)
@@ -106,7 +120,8 @@ def cli():
         number = args.get('number')
         preview(dest_folder=dest_folder, number=number, **config)
     elif cmd == 'images':
-        download_images(dest_folder=dest_folder, **config)
+        threadcount = args.get('threadcount')
+        download_images(dest_folder=dest_folder, threadcount=threadcount, **config)
     elif cmd == 'package':
         package_directory(dest_folder=dest_folder, **config)
 

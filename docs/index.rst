@@ -8,6 +8,8 @@ Label Maker Documentation
 
 Label Maker generates training data for ML algorithms focused on overhead imagery (e.g., from satellites or drones). It downloads OpenStreetMap QA Tile information and overhead imagery tiles and saves them as an Numpy `.npz <https://docs.scipy.org/doc/numpy/reference/generated/numpy.savez.html>`_ file for easy use in ML pipelines. For more details, see the `inaugural blog post <https://developmentseed.org/blog/2018/01/11/label-maker/>`_.
 
+*version*: |version|
+
 Requirements
 ============
 * `Python 3.6 <https://www.python.org/>`_
@@ -71,7 +73,7 @@ Retiles the OSM data to the desired zoom level, creates label data (``labels.npz
 
 Accepts one additional flag:
 
-	``-s`` or ``--sparse``: boolean 
+	``-s`` or ``--sparse``: boolean
 		Specifies if features in the class of interest are sparse. If ``True``, only save labels for up to ``n`` background tiles, where ``n`` is equal to ``background_ratio`` times the number of tiles with a class label. Defaults to ``False``.
 
 .. code-block:: bash
@@ -103,10 +105,17 @@ CLI Step 4: images
 ^^^^^^^^^^^^^^^^^^
 
 Downloads all imagery tiles needed to create the training data. Requires the ``labels.npz`` file from the ``label-maker labels`` step.
+The number of background tiles added depends on the `background_ratio` parameter specified in the `config.json` file.
+A background_ratio of 0 will return no background tiles. 
+
+Accepts one additional flag:
+
+	``-t`` or ``--threadcount``: int
+		Specifies the number of threads used to download imagery tiles in parallel. Defaults to ``10``.
 
 .. code-block:: bash
 
-	$ label-maker images
+	$ label-maker images -t 50
 	Downloading 1189 tiles to data/tiles
 
 CLI Step 5: package
